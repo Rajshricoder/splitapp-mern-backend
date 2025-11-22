@@ -1,78 +1,94 @@
 import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-// import { Server } from "socket.io";
-import {connect} from "./db/db.js"
-import http from 'http'
-// import userRoutes from './routes/User.js';
-// import{ signup, signin } from './backend/controllers/auth.js';
-import transroutes from './routes/transactions.js'
-import authroutes from './routes/auth.js';
-import savingroutes from './routes/savings.js';
-import billsRoutes from './routes/bills.js';
-import mailroutes from './routes/sendEmail.js'
-import userroutes from './routes/user.js';
-import grouproutes from './routes/groups.js'
-import friendroutes from './routes/friends.js'
+import { connect } from "./db/db.js";
+import http from "http";
 
+import transroutes from "./routes/transactions.js";
+import authroutes from "./routes/auth.js";
+import savingroutes from "./routes/savings.js";
+import billsRoutes from "./routes/bills.js";
+import mailroutes from "./routes/sendEmail.js";
+import userroutes from "./routes/user.js";
+import grouproutes from "./routes/groups.js";
+import friendroutes from "./routes/friends.js";
 
-import bodyParser from 'body-parser'
+import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import cors from "cors";
-// const server = http.createServer();
-// const io = new Server(server);
+
 const app = express();
 dotenv.config();
 
-//Middleware
-app.use(cors())
-app.use(cookieParser())
-app.use(express.json())
+// Middleware
+app.use(cors());
+app.use(cookieParser());
+app.use(express.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use("/api/bills",billsRoutes)
-app.use("/api/transactions",transroutes)
-app.use("/api/savings",savingroutes)  
-app.use("/api/auth",authroutes)
-app.use("/api/mail",mailroutes) 
-app.use("/api/user",userroutes)  
-app.use("/api/group",grouproutes)
-app.use("/api/friend",friendroutes)
 
+// Routes
+app.use("/api/bills", billsRoutes);
+app.use("/api/transactions", transroutes);
+app.use("/api/savings", savingroutes);
+app.use("/api/auth", authroutes);
+app.use("/api/mail", mailroutes);
+app.use("/api/user", userroutes);
+app.use("/api/group", grouproutes);
+app.use("/api/friend", friendroutes);
 
-// app.use("/api",signinwithgoogle)
-// app.use("/api/auth/",signin)
+// ✅ HEALTH CHECK ROUTE
+app.get("/health", async (req, res) => {
+    try {
+        const dbStatus = mongoose.connection.readyState;
 
-app.use((err,req,res,next)=>{
-    const status = err.status||500;
-    const message = err.message||"errorrrr";
+        const statusMap = {
+            0: "disconnected",
+            1: "connected",
+            2: "connecting",
+            3: "disconnecting"
+        };
+
+        return res.status(200).json({
+            status: "OK",
+            server: "running",
+            database: statusMap[dbStatus] || "unknown"
+        });
+    } catch (err) {
+        return res.status(500).json({
+            status: "ERROR",
+            message: err.message
+        });
+    }
+});
+
+// Error middleware
+app.use((err, req, res, next) => {
+    const status = err.status || 500;
+    const message = err.message || "errorrrr";
     console.log(err);
     return res.status(status).json({
-        success:false,
+        success: false,
         status,
         message,
-    })
-})
+    });
+});
 
-// io.on('connection', (socket) => {
-//     console.log('A user connected');
-  
-//     // Listen for comments from clients
-//     socket.on('comment', (data) => {
-//       // Broadcast the comment to all connected clients
-//       io.emit('comment', data);
-//     });
-  
-//     socket.on('disconnect', () => {
-//       console.log('A user disconnected');
-//     });
-//   });
-  
+// Start server ONLY AFTER DB connects
+const PORT = process.env.PORT || 3001;
 
-//server listens on port 3001
-const PORT=process.env.PORT||3001
-app.listen(PORT,()=>{
-    //connecting to database
-    connect()
-    //connecting to server
-    console.log("connected");
-})
+const startServer = async () => {
+    try {
+        await connect();       // ⬅ your db.js connect function
+        console.log("MongoDB connected");
+
+        app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+        });
+
+    } catch (err) {
+        console.error("Failed to start server:", err);
+        process.exit(1);
+    }
+};
+
+startServer();
